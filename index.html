@@ -1,0 +1,575 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <title>MC Bot Manager (v3.0)</title>
+  <style>
+    /* Global CSS Variables (Asosiy ranglar) */
+    :root {
+      --bg-main: #23272a;
+      --bg-dark: #1b1e20;
+      --bg-light: #2c2f33;
+      --border-color: #4f545c;
+      --text-main: #f5f6fa;
+      --text-dim: #99aab5;
+      --color-green: #43b581;
+      --color-red: #f04747;
+      --color-yellow: #faa61a;
+      --color-blue: #7289da;
+    }
+    body {
+      font-family: 'Segoe UI', Arial, sans-serif;
+      margin: 0;
+      background: var(--bg-main);
+      color: var(--text-main);
+      display: flex;
+    }
+    aside {
+      width: 280px;
+      background: var(--bg-dark);
+      padding: 16px;
+      height: 100vh;
+      box-sizing: border-box;
+      border-right: 1px solid var(--border-color);
+      display: flex;
+      flex-direction: column;
+      overflow-y: auto; /* Agar forma sig'masa */
+    }
+    main {
+      flex-grow: 1;
+      padding: 24px;
+      height: 100vh;
+      box-sizing: border-box;
+      overflow-y: auto;
+    }
+    h2, h3 { border-bottom: 1px solid var(--border-color); padding-bottom: 8px; margin-top: 0; }
+    
+    /* System Stats */
+    #sys-stats .stat {
+      font-size: 0.9em;
+      margin-bottom: 12px;
+      color: var(--text-dim);
+    }
+    #sys-stats .stat strong { color: var(--text-main); font-weight: 600; }
+    #sys-stats progress { width: 100%; height: 10px; border-radius: 5px; }
+    #sys-stats progress::-webkit-progress-bar { background: var(--bg-light); border-radius: 5px; }
+    #sys-stats progress::-webkit-progress-value { background: var(--color-blue); border-radius: 5px; }
+    #cpu-temp { color: var(--color-red); font-weight: bold; } /* Haroratni ajratib ko'rsatish */
+
+
+    /* Add Bot Form */
+    #add-bot-form { display: flex; flex-direction: column; gap: 10px; }
+    #add-bot-form input, #add-bot-form button {
+      padding: 10px;
+      border: 1px solid var(--border-color);
+      background: var(--bg-light);
+      color: var(--text-main);
+      border-radius: 5px;
+      font-size: 0.9em;
+    }
+    #add-bot-form input::placeholder { color: var(--text-dim); }
+    #add-bot-form button { background: var(--color-blue); cursor: pointer; font-weight: bold; }
+    #add-bot-form button:hover { opacity: 0.9; }
+
+    /* Bot List */
+    #bot-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 16px; }
+    .bot-card {
+      background: var(--bg-light);
+      border: 1px solid var(--border-color);
+      border-radius: 8px;
+      padding: 16px;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    }
+    .bot-card .header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }
+    .bot-card .header h4 { margin: 0; font-size: 1.2em; }
+    .bot-card .status {
+      padding: 4px 8px;
+      border-radius: 5px;
+      font-size: 0.8em;
+      font-weight: bold;
+      text-transform: uppercase;
+    }
+    .bot-card .status.offline { background: var(--color-red); color: #fff; }
+    .bot-card .status.online { background: var(--color-green); color: #fff; }
+    .bot-card .status.connecting { background: var(--color-yellow); color: #000; }
+    /* YANGI STIL: Captcha holati uchun */
+    .bot-card .status.captcha { background: var(--color-blue); color: #fff; }
+    
+    .bot-card .info { font-size: 0.9em; color: var(--text-dim); margin-bottom: 12px; }
+    .bot-card .info div { margin-bottom: 4px; }
+    .bot-card .info strong { color: var(--text-main); }
+
+    .bot-card .actions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+    }
+    .bot-card .actions button {
+      padding: 8px 12px;
+      border: none;
+      border-radius: 5px;
+      cursor: pointer;
+      font-weight: 600;
+    }
+    .btn-start { background: var(--color-green); color: #fff; }
+    .btn-stop { background: var(--color-red); color: #fff; }
+    .btn-login { background: var(--color-blue); color: #fff; }
+    .btn-anarxiya { background: var(--color-yellow); color: #000; }
+    .btn-logs { background: var(--bg-main); color: var(--text-dim); border: 1px solid var(--border-color); }
+    .btn-delete { background: none; border: 1px solid var(--color-red); color: var(--color-red); }
+    .bot-card .actions button:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+
+    /* Log Modal */
+    #log-modal {
+      display: none; /* Hidden by default */
+      position: fixed;
+      z-index: 1000;
+      left: 0; top: 0;
+      width: 100%; height: 100%;
+      background: rgba(0, 0, 0, 0.6);
+      justify-content: center;
+      align-items: center;
+    }
+    #log-modal-content {
+      background: var(--bg-dark);
+      width: 90%;
+      max-width: 1000px;
+      height: 80%;
+      border-radius: 8px;
+      border: 1px solid var(--border-color);
+      display: flex;
+      flex-direction: column;
+    }
+    #log-modal-header {
+      padding: 16px;
+      border-bottom: 1px solid var(--border-color);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    #log-modal-header h3 { margin: 0; }
+    #log-modal-close {
+      font-size: 1.5em;
+      font-weight: bold;
+      cursor: pointer;
+      color: var(--text-dim);
+    }
+    #log-modal-body {
+      padding: 16px;
+      flex-grow: 1;
+      display: flex;
+      gap: 16px;
+      overflow: hidden;
+    }
+    #log-modal-body > div { width: 50%; display: flex; flex-direction: column; }
+    .log-window {
+      flex-grow: 1;
+      border: 1px solid var(--border-color);
+      background: #000;
+      overflow: auto;
+      padding: 8px;
+      font-family: 'Consolas', 'Courier New', monospace;
+      font-size: 0.9em;
+      color: #eee;
+    }
+    .log-window .chat-msg { color: #fff; }
+    .log-window .log-msg { color: #0f0; }
+    .log-window .sys-msg { color: #faa61a; }
+    
+    #log-modal-footer {
+      padding: 16px;
+      border-top: 1px solid var(--border-color);
+      display: flex;
+      gap: 10px;
+    }
+    #log-modal-footer input[type=text] {
+      flex-grow: 1;
+      padding: 10px;
+      border: 1px solid var(--border-color);
+      background: var(--bg-light);
+      color: var(--text-main);
+      border-radius: 5px;
+    }
+    #log-modal-footer button {
+      padding: 10px 16px;
+      border: none;
+      border-radius: 5px;
+      cursor: pointer;
+      font-weight: bold;
+      background: var(--color-blue);
+      color: #fff;
+    }
+
+  </style>
+</head>
+<body>
+
+  <aside>
+    <h2>Bot Manager (v3.0)</h2>
+    
+    <div id="sys-stats">
+      <h3>Server Stats</h3>
+      <div class="stat">
+        <strong>Server Time:</strong> <span id="server-time">--:--:--</span>
+      </div>
+      <div class="stat">
+        <strong>CPU Load:</strong> <span id="cpu-load">--</span>%
+        <progress id="cpu-progress" value="0" max="100"></progress>
+      </div>
+      <div class="stat">
+        <strong>CPU Temp:</strong> <span id="cpu-temp">--</span>°C
+      </div>
+      <div class="stat">
+        <strong>Memory:</strong> <span id="mem-used">--</span> / <span id="mem-total">--</span> GB
+        <progress id="mem-progress" value="0" max="100"></progress>
+      </div>
+    </div>
+    
+    <hr style="border-color: var(--border-color); margin: 20px 0;">
+
+    <form id="add-bot-form">
+      <h3>Add New Bot</h3>
+      <input type="text" id="form-name" placeholder="Bot Nomi (M: AFK fermer)" required>
+      <input type="text" id="form-host" placeholder="Server IP (M: bytemc.uz)" required>
+      <input type="number" id="form-port" placeholder="Port (M: 25565)" value="25565" required>
+      <input type="text" id="form-username" placeholder="Bot Nicki" required>
+      <input type="text" id="form-password" placeholder="Parol (/login uchun)">
+      <input type="text" id="form-local-ip" placeholder="Lokal IP (bo'sh qoldiring)">
+      <button type="submit">Qo'shish</button>
+    </form>
+  </aside>
+
+  <main>
+    <h2>Boshqaruv Paneli</h2>
+    <div id="bot-list">
+      </div>
+  </main>
+
+  <div id="log-modal">
+    <div id="log-modal-content">
+      <div id="log-modal-header">
+        <h3 id="modal-bot-name">Bot Logs</h3>
+        <span id="log-modal-close">&times;</span>
+      </div>
+      <div id="log-modal-body">
+        <div>
+          <h4>Chat (Alohida chat log fayliga yozilmoqda)</h4>
+          <div id="modal-chat-log" class="log-window"></div>
+        </div>
+        <div>
+          <h4>Server Log (Alohida console log fayliga yozilmoqda)</h4>
+          <div id="modal-console-log" class="log-window"></div>
+        </div>
+      </div>
+      <div id="log-modal-footer">
+        <input id="modal-custom-cmd" type="text" placeholder="/say hello yoki !somecmd">
+        <button id="modal-send-cmd">Yuborish</button>
+        <input id="modal-captcha-code" type="text" placeholder="Captcha (agar kerak bo'lsa)">
+        <button id="modal-send-captcha">Captcha</button>
+      </div>
+    </div>
+  </div>
+
+  <template id="bot-card-template">
+    <div class="bot-card">
+      <div class="header">
+        <h4 class="bot-name">Bot Name</h4>
+        <span class="status offline">Offline</span>
+      </div>
+      <div class="info">
+        <div>Server: <strong class="bot-server">host:port</strong></div>
+        <div>Nick: <strong class="bot-nick">username</strong></div>
+        <div>Lokal IP: <strong class="bot-local-ip">Avtomatik</strong></div>
+        <div>Uptime: <strong class="bot-uptime">0s</strong></div>
+        <div>Holat: <strong class="bot-status-text">Kutmoqda...</strong></div>
+        <div>Oxirgi Start: <strong class="bot-last-start">--</strong></div>
+        <div>Oxirgi Stop: <strong class="bot-last-stop">--</strong></div>
+      </div>
+      <div class="actions">
+        <button class="btn-start">Start</button>
+        <button class="btn-stop" disabled>Stop</button>
+        <button class="btn-login" disabled>Login</button>
+        <button class="btn-anarxiya" disabled>Anarxiya</button>
+        <button class="btn-logs">Logs</button>
+        <button class="btn-delete">Delete</button>
+      </div>
+    </div>
+  </template>
+
+
+  <script src="/socket.io/socket.io.js"></script>
+  <script>
+    const socket = io();
+
+    // Elementlar
+    const botListEl = document.getElementById('bot-list');
+    const template = document.getElementById('bot-card-template');
+    
+    // Stats elementlari
+    const serverTimeEl = document.getElementById('server-time');
+    const cpuLoadEl = document.getElementById('cpu-load');
+    const cpuProgressEl = document.getElementById('cpu-progress');
+    const cpuTempEl = document.getElementById('cpu-temp'); // YANGI: CPU Harorati
+    const memUsedEl = document.getElementById('mem-used');
+    const memTotalEl = document.getElementById('mem-total');
+    const memProgressEl = document.getElementById('mem-progress');
+
+    // Add Bot Form
+    const addBotForm = document.getElementById('add-bot-form');
+
+    // Modal elementlari
+    const logModal = document.getElementById('log-modal');
+    const modalBotName = document.getElementById('modal-bot-name');
+    const modalChatLog = document.getElementById('modal-chat-log');
+    const modalConsoleLog = document.getElementById('modal-console-log');
+    const modalCloseBtn = document.getElementById('log-modal-close');
+    const modalSendCmdBtn = document.getElementById('modal-send-cmd');
+    const modalCustomCmdInput = document.getElementById('modal-custom-cmd');
+    const modalSendCaptchaBtn = document.getElementById('modal-send-captcha');
+    const modalCaptchaInput = document.getElementById('modal-captcha-code');
+
+    let currentViewingBotId = null;
+
+    // --- Helper Functions ---
+    function formatTimestamp(isoString) {
+      if (!isoString) return '--';
+      try {
+        // vaqtni mahalliy vaqt zonasida ko'rsatish
+        return new Date(isoString).toLocaleString('uz-UZ', {
+          hour: '2-digit', minute: '2-digit', second: '2-digit',
+          day: '2-digit', month: '2-digit', year: 'numeric'
+        });
+      } catch (e) {
+        return isoString;
+      }
+    }
+
+    function appendToLog(logEl, text, type = 'log') {
+      const p = document.createElement('div');
+      p.textContent = text;
+      // Log turlari: chat-msg (oq), log-msg (yashil), sys-msg (sariq)
+      p.classList.add(type === 'chat' ? 'chat-msg' : (type === 'sys' ? 'sys-msg' : 'log-msg'));
+      logEl.appendChild(p);
+      logEl.scrollTop = logEl.scrollHeight;
+    }
+
+    // --- Bot Card Management ---
+    function createOrUpdateCard(bot) {
+      let card = document.getElementById(bot.id);
+      if (!card) {
+        card = template.content.cloneNode(true).firstElementChild;
+        card.id = bot.id;
+        botListEl.appendChild(card);
+      }
+
+      // Populate data
+      card.querySelector('.bot-name').textContent = bot.name;
+      card.querySelector('.bot-server').textContent = `${bot.serverHost}:${bot.serverPort}`;
+      card.querySelector('.bot-nick').textContent = bot.username;
+      
+      // *** YANGI O'ZGARISH ***
+      // Lokal IP ni ko'rsatish. Agar yo'q bo'lsa "Avtomatik"
+      card.querySelector('.bot-local-ip').textContent = bot.localAddress || 'Avtomatik';
+      // **********************
+      
+      card.querySelector('.bot-last-start').textContent = formatTimestamp(bot.lastStart);
+      card.querySelector('.bot-last-stop').textContent = formatTimestamp(bot.lastStop);
+      
+      // status va uptime ni yangilash
+      updateCardStatus(bot.id, bot.status || { state: 'offline', message: 'Kutmoqda...' });
+      
+      // eventlarni bog'lash
+      card.querySelector('.btn-start').onclick = () => socket.emit('bot:start', bot.id);
+      card.querySelector('.btn-stop').onclick = () => socket.emit('bot:stop', bot.id);
+      card.querySelector('.btn-login').onclick = () => socket.emit('bot:login', bot.id);
+      card.querySelector('.btn-anarxiya').onclick = () => socket.emit('bot:anarxiya', bot.id);
+      card.querySelector('.btn-delete').onclick = () => {
+        if (confirm(`Rostan ham "${bot.name}" botini o'chirmoqchimisiz? (Jarayon ham to'xtaydi)`)) {
+          socket.emit('bot:remove', bot.id);
+        }
+      };
+      card.querySelector('.btn-logs').onclick = () => openLogModal(bot);
+    }
+
+    function updateCardStatus(botId, status) {
+      const card = document.getElementById(botId);
+      if (!card) return;
+      
+      const statusEl = card.querySelector('.status');
+      const statusTextEl = card.querySelector('.bot-status-text');
+      const startBtn = card.querySelector('.btn-start');
+      const stopBtn = card.querySelector('.btn-stop');
+      const loginBtn = card.querySelector('.btn-login');
+      const anarxiyaBtn = card.querySelector('.btn-anarxiya');
+      const uptimeEl = card.querySelector('.bot-uptime');
+      
+      // Statusni yangilash
+      statusEl.textContent = status.state;
+      statusEl.className = `status ${status.state}`;
+      statusTextEl.textContent = status.message;
+
+      // Tugmalarni faollashtirish
+      const isOnline = status.state === 'online';
+      const isConnecting = status.state === 'connecting';
+      const isCaptcha = status.state === 'captcha'; // YANGI: Captcha holati
+
+      startBtn.disabled = isOnline || isConnecting || isCaptcha;
+      stopBtn.disabled = !isOnline && !isConnecting && !isCaptcha;
+      loginBtn.disabled = !isOnline;
+      anarxiyaBtn.disabled = !isOnline;
+
+      // Uptime ni yangilash (agar status ob'yektida bo'lsa, uni birdaniga ko'rsatamiz)
+      if (status.uptime) {
+          uptimeEl.textContent = status.uptime;
+      } else if (!isOnline && !isCaptcha) { // Captcha paytida uptime to'xtamasligi kerak
+          uptimeEl.textContent = '0s';
+      }
+    }
+
+    // --- Modal ---
+    function openLogModal(bot) {
+      currentViewingBotId = bot.id;
+      modalBotName.textContent = `${bot.name} (${bot.username})`;
+      modalChatLog.innerHTML = '';
+      modalConsoleLog.innerHTML = '';
+      
+      appendToLog(modalConsoleLog, `"${bot.name}" uchun loglarga ulanilmoqda. Loglar alohida fayllarga yozilmoqda.`, 'sys');
+      
+      logModal.style.display = 'flex';
+    }
+
+    modalCloseBtn.onclick = () => {
+      logModal.style.display = 'none';
+      currentViewingBotId = null;
+    };
+    
+    modalSendCmdBtn.onclick = () => {
+      const cmd = modalCustomCmdInput.value.trim();
+      if (cmd && currentViewingBotId) {
+        socket.emit('bot:sendCommand', { botId: currentViewingBotId, cmd });
+        modalCustomCmdInput.value = '';
+      }
+    };
+    
+    modalSendCaptchaBtn.onclick = () => {
+      const code = modalCaptchaInput.value.trim();
+      if (code && currentViewingBotId) {
+        socket.emit('bot:solveCaptcha', { botId: currentViewingBotId, code });
+        modalCaptchaInput.value = '';
+      }
+    };
+    modalCustomCmdInput.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') modalSendCmdBtn.click();
+    });
+    modalCaptchaInput.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') modalSendCaptchaBtn.click();
+    });
+
+    // --- Form ---
+    addBotForm.onsubmit = (e) => {
+      e.preventDefault();
+      
+      // *** YANGI O'ZGARISH ***
+      const botConfig = {
+        name: document.getElementById('form-name').value,
+        serverHost: document.getElementById('form-host').value,
+        serverPort: parseInt(document.getElementById('form-port').value, 10),
+        username: document.getElementById('form-username').value,
+        password: document.getElementById('form-password').value,
+        // localAddress maydoni qo'shildi
+        localAddress: document.getElementById('form-local-ip').value.trim(), 
+        autoLogin: true // Yangi botlar uchun autologin avtomatik yoqilgan (data.json da saqlanadi)
+      };
+      // **********************
+      
+      if (!botConfig.name || !botConfig.serverHost || !botConfig.username) {
+        alert('Bot nomi, Server IP va Nick kiritilishi shart.');
+        return;
+      }
+      
+      socket.emit('bot:add', botConfig);
+      addBotForm.reset();
+    };
+
+    // --- Socket.IO Event Listeners ---
+
+    // Tizim statistikasi (CPU Temp qo'shilgan)
+    socket.on('system:stats', (stats) => {
+      serverTimeEl.textContent = stats.time; 
+      
+      cpuLoadEl.textContent = stats.cpu.toFixed(2);
+      cpuProgressEl.value = stats.cpu;
+      // YANGI: CPU Harorati
+      cpuTempEl.textContent = stats.cpuTemp; 
+
+      memUsedEl.textContent = stats.mem.used;
+      memTotalEl.textContent = stats.mem.total;
+      memProgressEl.value = stats.mem.percent;
+    });
+
+    // Barcha botlar ro'yxatini va holatini olish
+    socket.on('bots:list', (bots) => {
+      botListEl.innerHTML = '';
+      bots.forEach(createOrUpdateCard);
+    });
+
+    // Yangi bot qo'shilganda
+    socket.on('bot:added', (bot) => {
+      createOrUpdateCard(bot);
+    });
+
+    // Bot o'chirilganda
+    socket.on('bot:removed', (botId) => {
+      const card = document.getElementById(botId);
+      if (card) {
+        card.remove();
+      }
+    });
+
+    // Bot holati yangilanganda (Multi-Processdan keladi)
+    socket.on('bot:status', (data) => {
+      // data: { botId: '...', status: { state: 'online', message: '...', startTime: ... } }
+      updateCardStatus(data.botId, data.status);
+    });
+    
+    // Bot Uptime ni real-time yangilash (Manager hisoblaydi)
+    socket.on('bot:uptime', (data) => {
+        const card = document.getElementById(data.botId);
+        if (card) {
+            // Faqat 'online' yoki 'captcha' holatida uptime'ni yangilash
+            const statusEl = card.querySelector('.status');
+            if (statusEl.classList.contains('online') || statusEl.classList.contains('captcha')) {
+                card.querySelector('.bot-uptime').textContent = data.uptime;
+            }
+        }
+    });
+
+
+    // Bot konfiguratsiyasi yangilanganda (oxirgi start/stop vaqti)
+    socket.on('bot:configUpdate', (botConfig) => {
+      const card = document.getElementById(botConfig.id);
+      if (!card) return;
+      card.querySelector('.bot-last-start').textContent = formatTimestamp(botConfig.lastStart);
+      card.querySelector('.bot-last-stop').textContent = formatTimestamp(botConfig.lastStop);
+      // *** YANGI O'ZGARISH ***
+      // Config yangilanganda lokal IP ni ham yangilash (odatda o'zgarmaydi, lekin har ehtimolga)
+      card.querySelector('.bot-local-ip').textContent = botConfig.localAddress || 'Avtomatik';
+      // **********************
+    });
+
+    // Botdan kelgan log xabari
+    socket.on('bot:log', (data) => {
+      // data: { botId: '...', line: '...', pos: 'CHAT' | 'CONSOLE' | 'SYSTEM' }
+      if (data.botId === currentViewingBotId) {
+        const type = data.pos === 'CHAT' ? 'chat' : (data.pos === 'SYSTEM' ? 'sys' : 'log');
+        const logEl = (data.pos === 'CHAT' || data.pos === 'SYSTEM' || data.pos === 'ACTION_BAR') ? modalChatLog : modalConsoleLog;
+        appendToLog(logEl, data.line, type);
+      }
+    });
+
+  </script>
+</body>
+</html>
